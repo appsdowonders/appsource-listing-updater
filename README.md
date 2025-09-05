@@ -64,7 +64,7 @@ An automated tool for translating and updating Microsoft 365 add-in listings acr
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/addin-selenium.git
+   git clone https://github.com/appsdowonders/appsource-listing-updater
    cd addin-selenium
    ```
 

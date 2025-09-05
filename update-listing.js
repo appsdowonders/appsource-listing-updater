@@ -201,42 +201,13 @@ async function performMicrosoftLogin(driver) {
       throw new Error(`Unexpected redirect to: ${currentUrl}`);
     }
     
-    // Check if we see "Pick an account" dialog first
-    console.log('Checking for account selection dialog...');
+    // Try for email input first
+    console.log('Looking for email input...');
     try {
-      // Look for account selection dialog
-      const accountDialog = await driver.wait(
-        until.elementLocated(By.xpath("//div[contains(text(), 'Pick an account') or contains(text(), 'Choose an account')]")),
-        5_000
-      );
-      
-      if (accountDialog) {
-        console.log('Found account selection dialog, looking for email option...');
-        // Look for the email address in the account list
-        const emailOption = await driver.wait(
-          until.elementLocated(By.xpath(`//div[contains(text(), '${MICROSOFT_EMAIL}') or contains(@data-testid, 'account')]//parent::*//parent::*`)),
-          10_000
-        );
-        
-        // Try to click the email option
-        try {
-          await emailOption.click();
-        } catch (e) {
-          console.log('Regular click failed, trying JavaScript click...');
-          await driver.executeScript("arguments[0].click();", emailOption);
-        }
-        
-        console.log('Selected account from dialog');
-        await driver.sleep(1500); // Wait for page transition
-      }
-    } catch (e) {
-      console.log('No account dialog found, proceeding with email input...');
-      
       // Wait for email input and fill it
-      console.log('Looking for email input...');
       const emailInput = await driver.wait(
         until.elementLocated(By.xpath("//input[@type='email' or @name='loginfmt']")),
-        30_000
+        5_000
       );
       
       // Scroll to element and wait for it to be clickable
@@ -254,6 +225,39 @@ async function performMicrosoftLogin(driver) {
       await emailInput.clear();
       await emailInput.sendKeys(MICROSOFT_EMAIL);
       console.log('Email entered');
+    } catch (e) {
+      console.log('No email input found, checking for account selection dialog...');
+      
+      // Check if we see "Pick an account" dialog
+      try {
+        // Look for account selection dialog
+        const accountDialog = await driver.wait(
+          until.elementLocated(By.xpath("//div[contains(text(), 'Pick an account') or contains(text(), 'Choose an account')]")),
+          5_000
+        );
+        
+        if (accountDialog) {
+          console.log('Found account selection dialog, looking for email option...');
+          // Look for the email address in the account list
+          const emailOption = await driver.wait(
+            until.elementLocated(By.xpath(`//div[contains(text(), '${MICROSOFT_EMAIL}') or contains(@data-testid, 'account')]//parent::*//parent::*`)),
+            10_000
+          );
+          
+          // Try to click the email option
+          try {
+            await emailOption.click();
+          } catch (e) {
+            console.log('Regular click failed, trying JavaScript click...');
+            await driver.executeScript("arguments[0].click();", emailOption);
+          }
+          
+          console.log('Selected account from dialog');
+          await driver.sleep(1500); // Wait for page transition
+        }
+      } catch (e) {
+        console.log('No account dialog found either, proceeding...');
+      }
     }
     
     // Click Next button (only if we're not in account selection flow)
@@ -344,14 +348,14 @@ async function navigateToProductListings(driver) {
   // Click on "Microsoft 365 and Copilot" section
   const m365Section = await driver.wait(
     until.elementLocated(By.xpath("//*[contains(text(), 'Microsoft 365 and Copilot')]")),
-    10_000
+    60_000
   );
   await m365Section.click();
   
   // Click on product using PRODUCT_NAME constant
   const productLink = await driver.wait(
     until.elementLocated(By.xpath(`//a[contains(text(), '${PRODUCT_NAME}')]`)),
-    90_000
+    60_000
   );
   await productLink.click();
   

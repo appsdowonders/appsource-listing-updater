@@ -13,9 +13,42 @@ const config = require('./config');
 const DESCRIPTION_FILE_PATH = config.DESCRIPTION_FILE_PATH;
 const PRODUCT_NAME = config.PRODUCT_NAME;
 const PRODUCT_SUMMARY = config.PRODUCT_SUMMARY;
+const SUPPORTED_LANGUAGES = config.SUPPORTED_LANGUAGES;
+const UPDATE_FIELDS = config.UPDATE_FIELDS;
+const LANGUAGE_FILTER = config.LANGUAGE_FILTER;
+const VALIDATION = config.VALIDATION;
 
 // Translation cache to store translated content
 const translationCache = new Map();
+
+// Helper functions for configuration
+function getFilteredLanguages() {
+  if (!LANGUAGE_FILTER.enabled) {
+    return SUPPORTED_LANGUAGES;
+  }
+  
+  let filteredLanguages = SUPPORTED_LANGUAGES;
+  
+  // Apply include filter
+  if (LANGUAGE_FILTER.include && LANGUAGE_FILTER.include.length > 0) {
+    filteredLanguages = filteredLanguages.filter(lang => 
+      LANGUAGE_FILTER.include.includes(lang.code)
+    );
+  }
+  
+  // Apply exclude filter
+  if (LANGUAGE_FILTER.exclude && LANGUAGE_FILTER.exclude.length > 0) {
+    filteredLanguages = filteredLanguages.filter(lang => 
+      !LANGUAGE_FILTER.exclude.includes(lang.code)
+    );
+  }
+  
+  return filteredLanguages;
+}
+
+function shouldUpdateField(fieldName) {
+  return UPDATE_FIELDS[fieldName] === true;
+}
 
 // Cache management functions
 function cacheTranslation(languageCode, translatedData) {
@@ -82,45 +115,6 @@ const openai = new OpenAI({
 });
 
 // Supported languages for translation
-const SUPPORTED_LANGUAGES = [
-  { code: 'en-US', name: 'English' },
-  { code: 'ar-SA', name: 'Arabic' },
-  { code: 'bg-BG', name: 'Bulgarian' },
-  { code: 'zh-CN', name: 'Chinese (Simplified)' },
-  { code: 'zh-TW', name: 'Chinese (Traditional)' },
-  { code: 'hr-HR', name: 'Croatian' },
-  { code: 'cs-CZ', name: 'Czech' },
-  { code: 'da-DK', name: 'Danish' },
-  { code: 'nl-NL', name: 'Dutch' },
-  { code: 'et-EE', name: 'Estonian' },
-  { code: 'fi-FI', name: 'Finnish' },
-  { code: 'fr-FR', name: 'French' },
-  { code: 'de-DE', name: 'German' },
-  { code: 'el-GR', name: 'Greek' },
-  { code: 'he-IL', name: 'Hebrew' },
-  { code: 'hu-HU', name: 'Hungarian' },
-  { code: 'id-ID', name: 'Indonesian' },
-  { code: 'it-IT', name: 'Italian' },
-  { code: 'ja-JP', name: 'Japanese' },
-  { code: 'ko-KR', name: 'Korean' },
-  { code: 'lv-LV', name: 'Latvian' },
-  { code: 'lt-LT', name: 'Lithuanian' },
-  { code: 'nb-NO', name: 'Norwegian (Bokmål)' },
-  { code: 'pl-PL', name: 'Polish' },
-  { code: 'pt-BR', name: 'Portuguese (Brazil)' },
-  { code: 'pt-PT', name: 'Portuguese (Portugal)' },
-  { code: 'ro-RO', name: 'Romanian' },
-  { code: 'ru-RU', name: 'Russian' },
-  { code: 'sr-Latn-RS', name: 'Serbian (Latin)' },
-  { code: 'sk-SK', name: 'Slovak' },
-  { code: 'sl-SI', name: 'Slovenian' },
-  { code: 'es-ES', name: 'Spanish' },
-  { code: 'sv-SE', name: 'Swedish' },
-  { code: 'th-TH', name: 'Thai' },
-  { code: 'tr-TR', name: 'Turkish' },
-  { code: 'uk-UA', name: 'Ukrainian' },
-  { code: 'vi-VN', name: 'Vietnamese' },
-];
 
 // Translation prompt for OpenAI
 const TRANSLATION_PROMPT = `You are a professional localization engine. Translate human-readable text from the provided text into {target_language}.
@@ -395,7 +389,7 @@ async function selectLanguage(driver, languageName, isFirstLanguage = false) {
     // Look for the language link in the table
     const languageLink = await driver.wait(
       until.elementLocated(By.xpath(`//a[contains(@href, 'languageid') and contains(text(), '${languageName}')]`)),
-      2_000
+      10_000
     );
     
     // Click on the language link
@@ -412,47 +406,67 @@ async function selectLanguage(driver, languageName, isFirstLanguage = false) {
 async function fillDescription(driver, descriptionText, summaryText) {
   console.log('Filling summary and description fields...');
   
-  // Fill summary field
-  console.log('Filling summary field...');
-  const summaryField = await driver.wait(
-    until.elementLocated(By.css('textarea#shortDescription.form-control')),
-    30_000
-  );
+  // Debug: Log what we're filling
+  console.log(`🔍 DEBUG - fillDescription called with:`);
+  console.log(`   Summary text length: ${summaryText.length} chars`);
+  console.log(`   Description text length: ${descriptionText.length} chars`);
+  console.log(`   Summary preview: ${summaryText.substring(0, 100)}...`);
   
-  await summaryField.click();
-  await driver.sleep(500);
+  // Fill summary field (if configured to update)
+  if (shouldUpdateField('summary')) {
+    console.log('Filling summary field...');
+    const summaryField = await driver.wait(
+      until.elementLocated(By.css('textarea#shortDescription.form-control')),
+      30_000
+    );
+    
+    await summaryField.click();
+    await driver.sleep(500);
+    
+    // Clear existing content
+    await summaryField.sendKeys(Key.COMMAND, 'a');
+    await summaryField.sendKeys(Key.DELETE);
+    await driver.sleep(500);
+    
+    // Fill with new text
+    await summaryField.sendKeys(summaryText);
+    await driver.sleep(1000);
+    
+    // Debug: Verify what was actually filled
+    const filledSummary = await summaryField.getAttribute('value') || await summaryField.getText() || '';
+    console.log(`🔍 DEBUG - Summary field after filling:`);
+    console.log(`   Length: ${filledSummary.length} chars`);
+    console.log(`   Preview: ${filledSummary.substring(0, 100)}...`);
+    
+    console.log('Successfully filled summary field');
+  } else {
+    console.log('⏭️  Skipping summary field update (disabled in config)');
+  }
   
-  // Clear existing content
-  await summaryField.sendKeys(Key.COMMAND, 'a');
-  await summaryField.sendKeys(Key.DELETE);
-  await driver.sleep(500);
-  
-  // Fill with new text
-  await summaryField.sendKeys(summaryText);
-  await driver.sleep(1000);
-  
-  console.log('Successfully filled summary field');
-  
-  // Fill description field
-  console.log('Filling description field...');
-  const descField = await driver.wait(
-    until.elementLocated(By.css('textarea#description.form-control')),
-    30_000
-  );
-  
-  await descField.click();
-  await driver.sleep(500);
-  
-  // Clear existing content
-  await descField.sendKeys(Key.COMMAND, 'a');
-  await descField.sendKeys(Key.DELETE);
-  await driver.sleep(500);
-  
-  // Fill with new text
-  await descField.sendKeys(descriptionText);
-  await driver.sleep(1000);
-  
-  console.log('Successfully filled description field');
+  // Fill description field (if configured to update)
+  if (shouldUpdateField('description')) {
+    console.log('Filling description field...');
+    const descField = await driver.wait(
+      until.elementLocated(By.css('textarea#description.form-control')),
+      30_000
+    );
+    
+    await descField.click();
+    await driver.sleep(500);
+    
+    // Clear existing content
+    await descField.sendKeys(Key.COMMAND, 'a');
+    await descField.sendKeys(Key.DELETE);
+    await driver.sleep(500);
+    
+    // Fill with new text
+    await descField.sendKeys(descriptionText);
+    await driver.sleep(1000);
+    
+    console.log('Successfully filled description field');
+  } else {
+    console.log('⏭️  Skipping description field update (disabled in config)');
+  }
 }
 
 async function clickSaveAndConfirm(driver) {
@@ -507,11 +521,11 @@ async function validateLanguageFields(driver, languageName, expectedSummary, exp
     // Get current values from the form fields
     const summaryField = await driver.wait(
       until.elementLocated(By.css('textarea#shortDescription.form-control')),
-      10_000
+      VALIDATION.timeout
     );
     const descriptionField = await driver.wait(
       until.elementLocated(By.css('textarea#description.form-control')),
-      10_000
+      VALIDATION.timeout
     );
 
     // Try multiple methods to get field values
@@ -774,7 +788,7 @@ async function translateText(text, targetLanguage) {
     const startTime = Date.now();
     
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
@@ -786,7 +800,7 @@ async function translateText(text, targetLanguage) {
         }
       ],
       max_tokens: 10000,
-      temperature: 0.3
+      temperature: 0
     });
     
     const endTime = Date.now();
@@ -837,16 +851,40 @@ async function translateListingData(englishData, languageCode, useCache = true) 
   
   console.log(`\n=== Translating listing data to ${languageCode} ===`);
   
-  const [translatedSummary, translatedDescription] = await Promise.all([
-    translateText(englishData.summary, languageCode),
-    translateText(englishData.description, languageCode)
-  ]);
-  
+  // Only translate fields that will be updated
+  const translationPromises = [];
   const translatedData = {
     name: englishData.name, // Keep name in English for consistency
-    summary: translatedSummary,
-    description: translatedDescription
+    summary: englishData.summary, // Default to original
+    description: englishData.description // Default to original
   };
+  
+  if (shouldUpdateField('summary')) {
+    console.log('🔄 Translating summary...');
+    translationPromises.push(
+      translateText(englishData.summary, languageCode).then(result => {
+        translatedData.summary = result;
+      })
+    );
+  } else {
+    console.log('⏭️  Skipping summary translation (disabled in config)');
+  }
+  
+  if (shouldUpdateField('description')) {
+    console.log('🔄 Translating description...');
+    translationPromises.push(
+      translateText(englishData.description, languageCode).then(result => {
+        translatedData.description = result;
+      })
+    );
+  } else {
+    console.log('⏭️  Skipping description translation (disabled in config)');
+  }
+  
+  // Wait for all translations to complete
+  if (translationPromises.length > 0) {
+    await Promise.all(translationPromises);
+  }
   
   // Cache the translation
   if (useCache) {
@@ -862,6 +900,20 @@ let scriptStartTime;
 async function main() {
   scriptStartTime = Date.now();
   console.log('Starting AppSource listing update process...');
+  
+  // Display configuration
+  console.log('\n📋 Configuration:');
+  console.log(`   Field updates: Summary=${shouldUpdateField('summary')}, Description=${shouldUpdateField('description')}`);
+  console.log(`   Language filtering: ${LANGUAGE_FILTER.enabled ? 'Enabled' : 'Disabled'}`);
+  console.log(`   Validation: ${VALIDATION.enabled ? 'Enabled' : 'Disabled'}`);
+  if (LANGUAGE_FILTER.enabled) {
+    if (LANGUAGE_FILTER.include.length > 0) {
+      console.log(`   Include languages: ${LANGUAGE_FILTER.include.join(', ')}`);
+    }
+    if (LANGUAGE_FILTER.exclude.length > 0) {
+      console.log(`   Exclude languages: ${LANGUAGE_FILTER.exclude.join(', ')}`);
+    }
+  }
   
   // Step 1: Read English listing data from CSV
   console.log('Reading English listing data...');
@@ -884,9 +936,12 @@ async function main() {
     // Step 3: Navigate to product listings
     await navigateToProductListings(driver);
 
-    // Step 4: Process each supported language
-    for (let i = 0; i < SUPPORTED_LANGUAGES.length; i++) {
-      const language = SUPPORTED_LANGUAGES[i];
+    // Step 4: Process each supported language (with filtering)
+    const languagesToProcess = getFilteredLanguages();
+    console.log(`📋 Processing ${languagesToProcess.length} languages (${LANGUAGE_FILTER.enabled ? 'filtered' : 'all'})`);
+    
+    for (let i = 0; i < languagesToProcess.length; i++) {
+      const language = languagesToProcess[i];
       const isFirstLanguage = i === 0;
       
       console.log(`\n=== Processing language: ${language.name} (${language.code}) ===`);
@@ -902,6 +957,12 @@ async function main() {
       // Only translate if language is available
       console.log(`Language found, translating content...`);
       const listingData = await translateListingData(englishData, language.code);
+      
+      // Debug: Log what we're about to fill
+      console.log(`🔍 DEBUG - Translation results for ${language.name}:`);
+      console.log(`   Summary length: ${listingData.summary.length} chars`);
+      console.log(`   Description length: ${listingData.description.length} chars`);
+      console.log(`   Summary preview: ${listingData.summary.substring(0, 100)}...`);
       
       // Fill the summary and description with translated content
       await fillDescription(driver, listingData.description, listingData.summary);
@@ -924,28 +985,33 @@ async function main() {
       await driver.sleep(2000);
     }
 
-    // Step 5: Perform validation workflow
-    console.log('\n🔍 Starting validation workflow...');
-    
-    // Validate cache before starting validation
-    const finalCacheStats = getCacheStats();
-    console.log(`📊 Final cache status: ${finalCacheStats.totalCached} translations cached`);
-    console.log(`📋 Cached languages: ${finalCacheStats.languages.join(', ')}`);
-    console.log(`✅ Successfully processed languages: ${processedLanguages.length}`);
-    console.log(`📋 Processed languages: ${processedLanguages.map(l => l.name).join(', ')}`);
-    
-    const validationResults = await performValidationWorkflow(driver, englishData, processedLanguages);
-    
-    // Log final validation summary
-    const successfulValidations = validationResults.filter(r => r.success).length;
-    const totalValidations = validationResults.length;
-    
-    console.log(`\n📊 FINAL VALIDATION SUMMARY:`);
-    console.log(`🎯 Languages processed initially: ${processedLanguages.length}`);
-    console.log(`🔍 Languages validated: ${totalValidations}`);
-    console.log(`✅ Successful validations: ${successfulValidations}/${totalValidations}`);
-    console.log(`❌ Failed validations: ${totalValidations - successfulValidations}/${totalValidations}`);
-    console.log(`💾 All validations used cached translations (no re-translation)`);
+    // Step 5: Perform validation workflow (if enabled)
+    if (VALIDATION.enabled) {
+      console.log('\n🔍 Starting validation workflow...');
+      
+      // Validate cache before starting validation
+      const finalCacheStats = getCacheStats();
+      console.log(`📊 Final cache status: ${finalCacheStats.totalCached} translations cached`);
+      console.log(`📋 Cached languages: ${finalCacheStats.languages.join(', ')}`);
+      console.log(`✅ Successfully processed languages: ${processedLanguages.length}`);
+      console.log(`📋 Processed languages: ${processedLanguages.map(l => l.name).join(', ')}`);
+      
+      const validationResults = await performValidationWorkflow(driver, englishData, processedLanguages);
+      
+      // Log final validation summary
+      const successfulValidations = validationResults.filter(r => r.success).length;
+      const totalValidations = validationResults.length;
+      
+      console.log(`\n📊 FINAL VALIDATION SUMMARY:`);
+      console.log(`🎯 Languages processed initially: ${processedLanguages.length}`);
+      console.log(`🔍 Languages validated: ${totalValidations}`);
+      console.log(`✅ Successful validations: ${successfulValidations}/${totalValidations}`);
+      console.log(`❌ Failed validations: ${totalValidations - successfulValidations}/${totalValidations}`);
+      console.log(`💾 All validations used cached translations (no re-translation)`);
+    } else {
+      console.log('\n⏭️  Skipping validation workflow (disabled in config)');
+      console.log(`✅ Successfully processed ${processedLanguages.length} languages without validation`);
+    }
     
   } finally {
     // Log summary of skipped languages

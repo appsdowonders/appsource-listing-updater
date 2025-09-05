@@ -77,13 +77,6 @@ function getCachedTranslationForValidation(languageCode, englishData) {
   if (cached) {
     console.log(`📋 Retrieved cached translation for validation: ${languageCode}`);
     
-    // Add debugging for Arabic specifically
-    if (languageCode === 'ar-SA') {
-      console.log(`🔍 DEBUG - Arabic cached content:`);
-      console.log(`   Summary length: ${cached.summary.length}`);
-      console.log(`   Description length: ${cached.description.length}`);
-   
-    }
     
     return {
       name: englishData.name, // Keep name in English for consistency
@@ -406,11 +399,6 @@ async function selectLanguage(driver, languageName, isFirstLanguage = false) {
 async function fillDescription(driver, descriptionText, summaryText) {
   console.log('Filling summary and description fields...');
   
-  // Debug: Log what we're filling
-  console.log(`🔍 DEBUG - fillDescription called with:`);
-  console.log(`   Summary text length: ${summaryText.length} chars`);
-  console.log(`   Description text length: ${descriptionText.length} chars`);
-  console.log(`   Summary preview: ${summaryText.substring(0, 100)}...`);
   
   // Fill summary field (if configured to update)
   if (shouldUpdateField('summary')) {
@@ -434,9 +422,6 @@ async function fillDescription(driver, descriptionText, summaryText) {
     
     // Debug: Verify what was actually filled
     const filledSummary = await summaryField.getAttribute('value') || await summaryField.getText() || '';
-    console.log(`🔍 DEBUG - Summary field after filling:`);
-    console.log(`   Length: ${filledSummary.length} chars`);
-    console.log(`   Preview: ${filledSummary.substring(0, 100)}...`);
     
     console.log('Successfully filled summary field');
   } else {
@@ -540,15 +525,7 @@ async function validateLanguageFields(driver, languageName, expectedSummary, exp
       currentDescription = await descriptionField.getText() || '';
     }
     
-    // Add debugging for Arabic specifically
-    if (languageName === 'Arabic') {
-      console.log(`🔍 DEBUG - Arabic form field extraction:`);
-      console.log(`   Summary field found: ${summaryField ? 'Yes' : 'No'}`);
-      console.log(`   Description field found: ${descriptionField ? 'Yes' : 'No'}`);
-      console.log(`   Summary value length: ${currentSummary.length}`);
-      console.log(`   Description value length: ${currentDescription.length}`);
-    
-    }
+ 
 
     // Validate by content length instead of text comparison
     const currentSummaryLength = currentSummary.trim().length;
@@ -960,8 +937,6 @@ async function main() {
       
       // Debug: Log what we're about to fill
       console.log(`🔍 DEBUG - Translation results for ${language.name}:`);
-      console.log(`   Summary length: ${listingData.summary.length} chars`);
-      console.log(`   Description length: ${listingData.description.length} chars`);
       console.log(`   Summary preview: ${listingData.summary.substring(0, 100)}...`);
       
       // Fill the summary and description with translated content

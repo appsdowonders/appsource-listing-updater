@@ -856,7 +856,13 @@ async function translateListingData(englishData, languageCode, useCache = true) 
   return translatedData;
 }
 
+// Global start time for timing
+let scriptStartTime;
+
 async function main() {
+  scriptStartTime = Date.now();
+  console.log('Starting AppSource listing update process...');
+  
   // Step 1: Read English listing data from CSV
   console.log('Reading English listing data...');
   const englishData = readEnglishListingData();
@@ -950,6 +956,15 @@ async function main() {
       console.log('\n✅ All languages processed successfully!');
     }
     
+    // Display total execution time
+    const endTime = Date.now();
+    const totalTime = endTime - scriptStartTime;
+    const minutes = Math.floor(totalTime / 60000);
+    const seconds = Math.floor((totalTime % 60000) / 1000);
+    const milliseconds = totalTime % 1000;
+    
+    console.log(`\n⏱️  Total execution time: ${minutes}m ${seconds}s ${milliseconds}ms`);
+    
     console.log('\nAll done. Closing browser in 3 seconds…');
     await new Promise((r) => setTimeout(r, 3000));
     await driver.quit();
@@ -957,6 +972,13 @@ async function main() {
 }
 
 main().catch((err) => {
+  const endTime = Date.now();
+  const totalTime = endTime - scriptStartTime;
+  const minutes = Math.floor(totalTime / 60000);
+  const seconds = Math.floor((totalTime % 60000) / 1000);
+  const milliseconds = totalTime % 1000;
+  
   console.error('\nERROR:', err);
+  console.error(`\n⏱️  Script failed after: ${minutes}m ${seconds}s ${milliseconds}ms`);
   process.exit(1);
 });

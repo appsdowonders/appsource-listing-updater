@@ -1,13 +1,17 @@
-# Microsoft 365 Add-in Listing Translation Tool
+# AppSource Listing Translation Tool
 
-An automated tool for translating and updating Microsoft 365 add-in listings across multiple languages using Selenium WebDriver and OpenAI's GPT models.
+A comprehensive solution for translating and updating Microsoft 365 add-in listings across multiple languages. Features both a modern web console interface and automated CLI script using Selenium WebDriver and OpenAI's GPT models.
 
 ## 🚀 Features
 
-- **Automated Translation**: Uses OpenAI GPT-4o-mini to translate product descriptions and summaries
+- **Dual Interface**: Modern React-based web console + powerful CLI automation script
+- **AI Translation**: Uses OpenAI GPT-4o-mini to translate product descriptions and summaries
+- **Database Persistence**: SQLite database for storing content and translations with full history
+- **Real-time Updates**: WebSocket integration for live console logs and progress tracking
 - **Multi-Language Support**: Supports 40+ languages including Arabic, Chinese, Japanese, Korean, and more
 - **Smart Validation**: Length-based validation system that works reliably with non-English characters
-- **Translation Caching**: Efficient caching system to avoid re-translating content during validation
+- **Translation Caching**: Efficient database caching system to avoid re-translating content
+- **Batch Operations**: Translate, update, and validate multiple languages simultaneously
 - **Error Handling**: Robust error handling with detailed logging and retry mechanisms
 - **Progress Tracking**: Real-time progress updates and comprehensive reporting
 
@@ -65,7 +69,7 @@ An automated tool for translating and updating Microsoft 365 add-in listings acr
 1. **Clone the repository**
    ```bash
    git clone https://github.com/appsdowonders/appsource-listing-updater
-   cd addin-selenium
+   cd appsource-listing-updater
    ```
 
 2. **Install dependencies**
@@ -87,28 +91,40 @@ An automated tool for translating and updating Microsoft 365 add-in listings acr
    nano config.js
    ```
 
-5. **Create description file**
-   ```bash
-   # Copy the example description file
-   cp description.example.txt description.txt
-   
-   # Edit with your product description
-   nano description.txt
-   ```
-
-6. **Configure your details**
+5. **Configure your details**
    Edit `config.js` with your information:
    ```javascript
-   PRODUCT_NAME: 'Your Product Name',
-   PRODUCT_SUMMARY: 'Your product summary',
-   MICROSOFT_EMAIL: 'your-email@domain.com',
-   MICROSOFT_PASSWORD: 'your-password',
-   OPENAI_API_KEY: 'your-openai-api-key',
+   module.exports = {
+     // Microsoft credentials
+     MICROSOFT_EMAIL: 'your-email@domain.com',
+     MICROSOFT_PASSWORD: 'your-password',
+     
+     // OpenAI API key
+     OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'your-openai-api-key',
+     
+     // Other settings...
+   };
    ```
 
 ## 🚀 Usage
 
-### Basic Usage
+### Web Console Interface (Recommended)
+
+1. **Start the web console**
+   ```bash
+   npm run console
+   ```
+
+2. **Open your browser**
+   Navigate to `http://localhost:3000`
+
+3. **Use the web interface**
+   - Add/edit your English content
+   - Select languages to translate
+   - Execute batch operations
+   - Monitor real-time progress
+
+### CLI Automation Script
 
 ```bash
 node update-listing.js
@@ -116,12 +132,12 @@ node update-listing.js
 
 ### What the tool does
 
-1. **Login**: Automatically logs into Microsoft Partner Center
-2. **Navigate**: Goes to your product's marketplace listings
-3. **Translate**: Translates content for each supported language
-4. **Fill Forms**: Automatically fills summary and description fields
-5. **Save**: Saves changes for each language
-6. **Validate**: Validates that translations were saved correctly
+1. **Content Management**: Store and manage English product content in database
+2. **Translation**: Use OpenAI to translate content to multiple languages
+3. **Automation**: Automatically log into Microsoft Partner Center
+4. **Form Filling**: Fill summary and description fields for each language
+5. **Validation**: Verify that translations were saved correctly
+6. **Progress Tracking**: Real-time updates and comprehensive reporting
 
 ### Console Output Example
 
@@ -172,28 +188,23 @@ Successfully selected language: Arabic
 
 ### Configuration Files
 
-The tool uses separate configuration files to keep sensitive information out of version control:
+The tool uses a centralized configuration system:
 
 - **`config.js`** - Your actual configuration (not in version control)
 - **`config.example.js`** - Template configuration file (in version control)
-- **`description.txt`** - Your product description (not in version control)
-- **`description.example.txt`** - Template description file (in version control)
+- **`database.js`** - SQLite database management
+- **`product_content.db`** - SQLite database file (created automatically)
 
 ### Setting Up Configuration
 
-1. **Copy the example files:**
+1. **Copy the example configuration:**
    ```bash
    cp config.example.js config.js
-   cp description.example.txt description.txt
    ```
 
 2. **Edit `config.js` with your details:**
    ```javascript
    module.exports = {
-     // Product details
-     PRODUCT_NAME: 'Your Product Name',
-     PRODUCT_SUMMARY: 'Your product summary',
-     
      // Microsoft credentials
      MICROSOFT_EMAIL: 'your-email@domain.com',
      MICROSOFT_PASSWORD: 'your-password',
@@ -201,11 +212,29 @@ The tool uses separate configuration files to keep sensitive information out of 
      // OpenAI API key
      OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'your-api-key',
      
-     // Other settings...
+     // URLs
+     LOGIN_URL: 'https://partner.microsoft.com/_login?authType=OpenIdConnect',
+     DASHBOARD_URL: 'https://partner.microsoft.com/en-us/dashboard/marketplace-offers/overview',
+     
+     // Language filtering
+     LANGUAGE_FILTER: {
+       enabled: false,
+       include: [],
+       exclude: []
+     },
+     
+     // Validation settings
+     VALIDATION: {
+       enabled: false,
+       timeout: 15_000
+     }
    };
    ```
 
-3. **Edit `description.txt` with your product description**
+3. **Add your content through the web interface**
+   - Start the console: `npm run console`
+   - Navigate to `http://localhost:3000`
+   - Add your product name, summary, and description
 
 ### Translation Settings
 
@@ -230,15 +259,21 @@ const lengthTolerance = 5; // Allow up to 5 characters difference
 
 ## 🔧 Advanced Features
 
-### Translation Caching
+### Database Persistence
 
-The tool automatically caches translations to avoid re-translating during validation:
+The tool uses SQLite for persistent storage:
 
-```javascript
-// Cache management
-function cacheTranslation(languageCode, translatedData) { ... }
-function getCachedTranslationForValidation(languageCode, englishData) { ... }
-```
+- **Product Content**: Store English content with version history
+- **Translations**: Cache all translations with timestamps
+- **Automatic Cleanup**: Database is created automatically on first run
+
+### Web Console Features
+
+- **Real-time Updates**: WebSocket integration for live progress tracking
+- **Content Preview**: View translations in both HTML and preview modes
+- **Batch Operations**: Select multiple languages for simultaneous processing
+- **Status Tracking**: Real-time status indicators for all operations
+- **Field Configuration**: Toggle which fields to update (summary/description)
 
 ### Smart Validation
 
@@ -254,52 +289,64 @@ const descriptionValid = Math.abs(currentDescriptionLength - expectedDescription
 Comprehensive error handling with retry mechanisms:
 
 - Automatic retry for failed validations
-- Detailed error logging
+- Detailed error logging with real-time console updates
 - Graceful handling of missing languages
 - Network timeout handling
+- Database transaction safety
 
 ## 📊 Monitoring and Logging
 
-### Progress Tracking
+### Web Console Monitoring
 
-The tool provides detailed progress updates:
+The web console provides comprehensive monitoring:
 
-- Real-time processing status
-- Translation progress
-- Validation results
-- Error reporting
-- Performance metrics
+- **Real-time Console Logs**: Live updates via WebSocket
+- **Progress Tracking**: Visual progress indicators for all operations
+- **Status Management**: Real-time status for translate/update/validate operations
+- **Cache Monitoring**: View cached translations and clear cache
+- **Error Reporting**: Detailed error messages with context
+
+### CLI Logging
+
+The CLI script provides detailed console output:
+
+- **Processing Status**: Step-by-step progress updates
+- **Translation Progress**: API response times and token usage
+- **Validation Results**: Detailed validation reports
+- **Performance Metrics**: Execution time and success rates
 
 ### Log Levels
 
 - **INFO**: General progress updates
-- **DEBUG**: Detailed validation information
-- **ERROR**: Error messages and stack traces
-- **SUCCESS**: Successful operations
+- **SUCCESS**: Successful operations (✅)
+- **WARNING**: Non-critical issues (⚠️)
+- **ERROR**: Error messages and stack traces (❌)
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-1. **Login Failed**
-   - Check Microsoft credentials
-   - Ensure 2FA is disabled or handle it manually
-   - Verify Partner Center access
+1. **Web Console Issues**
+   - **Port Already in Use**: Change PORT environment variable or kill existing process
+   - **Database Errors**: Delete `product_content.db` to reset database
+   - **Translation Failures**: Check OpenAI API key and internet connection
+   - **Content Not Loading**: Ensure you've added content through the web interface
 
-2. **Translation Errors**
-   - Verify OpenAI API key
-   - Check API quota and billing
-   - Ensure stable internet connection
+2. **CLI Script Issues**
+   - **Login Failed**: Check Microsoft credentials and 2FA settings
+   - **Translation Errors**: Verify OpenAI API key and API quota
+   - **Validation Failures**: Check if languages are available on the page
+   - **Browser Issues**: Update Chrome browser and check permissions
 
-3. **Validation Failures**
-   - Check if languages are available on the page
-   - Verify form field selectors
-   - Review length tolerance settings
+3. **Database Issues**
+   - **Corrupted Database**: Delete `product_content.db` to reset
+   - **Permission Errors**: Check file permissions in project directory
+   - **Migration Issues**: Database schema is created automatically
 
-4. **Browser Issues**
-   - Update Chrome browser
-   - Check Chrome profile permissions
-   - Clear browser cache if needed
+4. **API Issues**
+   - **OpenAI Rate Limits**: Check API usage and billing
+   - **Network Timeouts**: Ensure stable internet connection
+   - **Authentication Errors**: Verify API key is correct and active
 
 ### Debug Mode
 
@@ -327,6 +374,49 @@ console.log(`📏 Expected Summary Length: ${expectedSummaryLength}`);
 - Use least-privilege access
 
 
+## 📁 Project Structure
+
+```
+appsource-listing-updater/
+├── server.js              # Express server with API endpoints
+├── update-listing.js      # CLI automation script
+├── database.js            # SQLite database management
+├── config.js              # Configuration file (not in version control)
+├── config.example.js      # Example configuration
+├── package.json           # Dependencies and scripts
+├── product_content.db     # SQLite database (created automatically)
+├── public/
+│   └── index.html         # React web console interface
+├── chrome-profile/        # Chrome user data directory
+└── README.md              # This file
+```
+
+## 🚀 Quick Start
+
+1. **Clone and install**
+   ```bash
+   git clone https://github.com/appsdowonders/appsource-listing-updater
+   cd appsource-listing-updater
+   npm install
+   ```
+
+2. **Configure**
+   ```bash
+   cp config.example.js config.js
+   # Edit config.js with your credentials
+   ```
+
+3. **Start web console**
+   ```bash
+   npm run console
+   # Open http://localhost:3000
+   ```
+
+4. **Add content and translate**
+   - Add your product content in the web interface
+   - Select languages to translate
+   - Execute batch operations
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -344,7 +434,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you encounter any issues or have questions:
 
 1. Check the [Troubleshooting](#-troubleshooting) section
-2. Search existing [Issues](https://github.com/yourusername/addin-selenium/issues)
+2. Search existing [Issues](https://github.com/appsdowonders/appsource-listing-updater/issues)
 3. Create a new issue with detailed information
 4. Contact the maintainers
 

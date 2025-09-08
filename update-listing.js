@@ -8,21 +8,41 @@ const OpenAI = require('openai');
 
 // Load configuration
 const config = require('./config');
+const Database = require('./database');
 
 // ====== CONFIG ======
-const DESCRIPTION_FILE_PATH = config.DESCRIPTION_FILE_PATH;
-const PRODUCT_NAME = config.PRODUCT_NAME;
-const PRODUCT_SUMMARY = config.PRODUCT_SUMMARY;
 const SUPPORTED_LANGUAGES = config.SUPPORTED_LANGUAGES;
-const UPDATE_FIELDS = config.UPDATE_FIELDS;
+// Use environment variable if available (from web console), otherwise use config file or defaults
+const DEFAULT_UPDATE_FIELDS = {
+  summary: true,      // Update the summary field
+  description: true,  // Update the description field
+};
+const UPDATE_FIELDS = process.env.UPDATE_FIELDS ? 
+  JSON.parse(process.env.UPDATE_FIELDS) : 
+  (config.UPDATE_FIELDS || DEFAULT_UPDATE_FIELDS);
 const LANGUAGE_FILTER = config.LANGUAGE_FILTER;
 const VALIDATION = config.VALIDATION;
+
+// Get cached translations from environment variable (passed from web console)
+const CACHED_TRANSLATIONS = process.env.CACHED_TRANSLATIONS ? 
+  JSON.parse(process.env.CACHED_TRANSLATIONS) : 
+  {};
+
+// Initialize database
+const db = new Database();
 
 // Translation cache to store translated content
 const translationCache = new Map();
 
 // Helper functions for configuration
 function getFilteredLanguages() {
+  // Check if specific languages are requested via environment variable
+  if (process.env.UPDATE_LANGUAGES) {
+    const requestedLanguages = process.env.UPDATE_LANGUAGES.split(',').map(code => code.trim());
+    console.log(`🎯 Processing specific languages from console: ${requestedLanguages.join(', ')}`);
+    return SUPPORTED_LANGUAGES.filter(lang => requestedLanguages.includes(lang.code));
+  }
+  
   if (!LANGUAGE_FILTER.enabled) {
     return SUPPORTED_LANGUAGES;
   }
@@ -326,7 +346,7 @@ async function performMicrosoftLogin(driver) {
   }
 }
 
-async function navigateToProductListings(driver) {
+async function navigateToProductListings(driver, englishData) {
   console.log('Navigating to product listings...');
   
   // Navigate to dashboard
@@ -339,9 +359,9 @@ async function navigateToProductListings(driver) {
   );
   await m365Section.click();
   
-  // Click on product using PRODUCT_NAME constant
+  // Click on product using product name from database
   const productLink = await driver.wait(
-    until.elementLocated(By.xpath(`//a[contains(text(), '${PRODUCT_NAME}')]`)),
+    until.elementLocated(By.xpath(`//a[contains(text(), '${englishData.name}')]`)),
     60_000
   );
   await productLink.click();
@@ -737,19 +757,20 @@ async function performValidationWorkflow(driver, englishData, processedLanguages
   return validationResults;
 }
 
-function readEnglishListingData() {
-  // Read description from text file
-  const description = fs.readFileSync(DESCRIPTION_FILE_PATH, 'utf8').trim();
-  
-  if (!description) {
-    throw new Error('Description file is empty. Add content to description.txt');
+async function readEnglishListingData() {
+  try {
+    await db.init();
+    const content = await db.getProductContent();
+    
+    if (!content) {
+      throw new Error('No product content found in database. Please add content through the web interface.');
+    }
+    
+    return content;
+  } catch (error) {
+    console.error('Error reading English listing data:', error);
+    throw error;
   }
-  
-  return {
-    name: PRODUCT_NAME,
-    summary: PRODUCT_SUMMARY,
-    description: description
-  };
 }
 
 async function translateText(text, targetLanguage) {
@@ -803,10 +824,17 @@ async function translateListingData(englishData, languageCode, useCache = true) 
   if (languageCode === 'en-US') {
     console.log('Using original English content (no translation needed)');
     const englishDataWithName = {
-      name: englishData.name, // Keep name in English for consistency
-      summary: englishData.summary,
-      description: englishData.description
+      name: englishData.name // Keep name in English for consistency
     };
+    
+    // Only include fields that should be updated
+    if (shouldUpdateField('summary')) {
+      englishDataWithName.summary = englishData.summary;
+    }
+    
+    if (shouldUpdateField('description')) {
+      englishDataWithName.description = englishData.description;
+    }
     
     // Cache English content too for consistency
     if (useCache) {
@@ -816,14 +844,48 @@ async function translateListingData(englishData, languageCode, useCache = true) 
     return englishDataWithName;
   }
   
+  // Check if we have cached translations from web console first
+  const cachedTranslation = CACHED_TRANSLATIONS[languageCode];
+  if (cachedTranslation) {
+    console.log(`📋 Using cached translation from web console for ${languageCode}`);
+    const translatedData = {
+      name: englishData.name // Keep name in English for consistency
+    };
+    
+    // Only include fields that should be updated
+    if (shouldUpdateField('summary')) {
+      translatedData.summary = cachedTranslation.summary || englishData.summary;
+    }
+    
+    if (shouldUpdateField('description')) {
+      translatedData.description = cachedTranslation.description || englishData.description;
+    }
+    
+    // Cache the translated data for future use
+    if (useCache) {
+      cacheTranslation(languageCode, translatedData);
+    }
+    
+    return translatedData;
+  }
+  
   // Check cache first if useCache is enabled
   if (useCache && isTranslationCached(languageCode)) {
     const cached = getCachedTranslation(languageCode);
-    return {
-      name: englishData.name, // Keep name in English for consistency
-      summary: cached.summary,
-      description: cached.description
+    const translatedData = {
+      name: englishData.name // Keep name in English for consistency
     };
+    
+    // Only include fields that should be updated
+    if (shouldUpdateField('summary')) {
+      translatedData.summary = cached.summary;
+    }
+    
+    if (shouldUpdateField('description')) {
+      translatedData.description = cached.description;
+    }
+    
+    return translatedData;
   }
   
   console.log(`\n=== Translating listing data to ${languageCode} ===`);
@@ -831,9 +893,7 @@ async function translateListingData(englishData, languageCode, useCache = true) 
   // Only translate fields that will be updated
   const translationPromises = [];
   const translatedData = {
-    name: englishData.name, // Keep name in English for consistency
-    summary: englishData.summary, // Default to original
-    description: englishData.description // Default to original
+    name: englishData.name // Keep name in English for consistency
   };
   
   if (shouldUpdateField('summary')) {
@@ -876,13 +936,20 @@ let scriptStartTime;
 
 async function main() {
   scriptStartTime = Date.now();
-  console.log('Starting AppSource listing update process...');
+  
+  // Check if this is being called from the console
+  if (process.env.UPDATE_LANGUAGES) {
+    console.log('🖥️  Starting AppSource listing update process from console...');
+  } else {
+    console.log('Starting AppSource listing update process...');
+  }
   
   // Display configuration
   console.log('\n📋 Configuration:');
   console.log(`   Field updates: Summary=${shouldUpdateField('summary')}, Description=${shouldUpdateField('description')}`);
   console.log(`   Language filtering: ${LANGUAGE_FILTER.enabled ? 'Enabled' : 'Disabled'}`);
   console.log(`   Validation: ${VALIDATION.enabled ? 'Enabled' : 'Disabled'}`);
+  console.log(`   Cached translations: ${Object.keys(CACHED_TRANSLATIONS).length} languages available`);
   if (LANGUAGE_FILTER.enabled) {
     if (LANGUAGE_FILTER.include.length > 0) {
       console.log(`   Include languages: ${LANGUAGE_FILTER.include.join(', ')}`);
@@ -892,9 +959,9 @@ async function main() {
     }
   }
   
-  // Step 1: Read English listing data from CSV
+  // Step 1: Read English listing data from database
   console.log('Reading English listing data...');
-  const englishData = readEnglishListingData();
+  const englishData = await readEnglishListingData();
   console.log('English data loaded:', {
     name: englishData.name,
     summary: englishData.summary.substring(0, 50) + '...',
@@ -911,7 +978,7 @@ async function main() {
     await performMicrosoftLogin(driver);
     
     // Step 3: Navigate to product listings
-    await navigateToProductListings(driver);
+    await navigateToProductListings(driver, englishData);
 
     // Step 4: Process each supported language (with filtering)
     const languagesToProcess = getFilteredLanguages();
@@ -937,10 +1004,15 @@ async function main() {
       
       // Debug: Log what we're about to fill
       console.log(`🔍 DEBUG - Translation results for ${language.name}:`);
-      console.log(`   Summary preview: ${listingData.summary.substring(0, 100)}...`);
+      if (listingData.summary) {
+        console.log(`   Summary preview: ${listingData.summary.substring(0, 100)}...`);
+      }
+      if (listingData.description) {
+        console.log(`   Description preview: ${listingData.description.substring(0, 100)}...`);
+      }
       
       // Fill the summary and description with translated content
-      await fillDescription(driver, listingData.description, listingData.summary);
+      await fillDescription(driver, listingData.description || '', listingData.summary || '');
       
       // Save and confirm
       const conf = await clickSaveAndConfirm(driver);
@@ -1009,6 +1081,13 @@ async function main() {
     console.log('\nAll done. Closing browser in 3 seconds…');
     await new Promise((r) => setTimeout(r, 3000));
     await driver.quit();
+    
+    // Close database connection
+    try {
+      await db.close();
+    } catch (error) {
+      console.error('Error closing database:', error);
+    }
   }
 }
 

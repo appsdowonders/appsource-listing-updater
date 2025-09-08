@@ -1,6 +1,10 @@
 # Configuration files (contain sensitive information)
 config.js
-description.txt
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
 
 # Dependencies
 node_modules/

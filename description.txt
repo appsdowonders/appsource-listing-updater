@@ -1,0 +1,68 @@
+<p><strong><a href="https://twistlycells.ai/" target="_blank">Meet TwistlyCells – The Ultimate ChatGPT for Excel Add-in</a></strong></p>
+<p>Automate, analyze, and accelerate your spreadsheets with AI. TwistlyCells saves hours by turning messy data into clear insights—no more wrestling with formulas or repetitive tasks. Unlike external apps, TwistlyCells works directly inside Excel with purpose-built tools.</p>
+
+<br />
+
+<p><strong>→ A Full Suite of Excel AI Tools That Work For You</strong></p>
+<p>Here are just a few examples of how GPT for Excel can help you sparkle:</p>
+<ul>
+  <li><strong>AI.ASK:</strong> let AI answer questions and write engaging content</li>
+  <li><strong>AI.TABLE:</strong> create AI-powered tables in seconds</li>
+  <li><strong>AI.TRANSLATE:</strong> translate your content into dozens of languages</li>
+  <li><strong>AI.FORMAT:</strong> quickly format your data with AI for consistency</li>
+  <li><strong>AI.EXTRACT:</strong> extract valuable data insights</li>
+  <li><strong>AI.FILL:</strong> clean your data and fill in missing ranges</li>
+  <li><strong>AI.LIST:</strong> generate list outputs in separate rows</li>
+  <li><strong>AI.CHOICE:</strong> chooses the most closely matching value from a given list of choices</li>
+</ul>
+
+<br />
+
+<p><strong>→ Why TwistlyCells is the Best AI for Excel</strong></p>
+<ul>
+  <li><strong>Purpose-Built Excel AI</strong> – Not just a chatbot; real Excel functions designed for structured, accurate results.</li>
+  <li><strong>Dual AI Engine</strong> – TwistlyCells brings the most advanced Excel GPT capabilities to your workflow: GPT-5 mini, GPT-5 nano, GPT-4o mini, GPT-4o (omni), GPT-4 Turbo, GPT-4, GPT-3.5 Turbo, Claude 3.5 Sonnet, Claude 3 Opus, and Claude 3 Haiku.</li>
+  <li><strong>Seamless Integration</strong> – Add AI to your existing sheets instantly, without rebuilding files.</li>
+  <li><strong>Private &amp; Secure</strong> – Enterprise-grade privacy keeps your data safe.</li>
+</ul>
+
+<br />
+
+<p><strong>→ Get Started in Seconds</strong></p>
+<ol>
+  <li>Install the TwistlyCells add-in → "Get it now."</li>
+  <li>Open Excel and launch the sidebar.</li>
+  <li>Pick a tool (like <strong>AI.ASK</strong> or <strong>AI.FORMULA</strong>) and type in plain English.</li>
+  <li>Watch AI handle the work instantly.</li>
+</ol>
+
+<br />
+
+<p><strong>→ Who Uses TwistlyCells?</strong></p>
+<ul>
+  <li><strong>Business &amp; Finance</strong> – Faster financial modeling, reporting, and analysis.</li>
+  <li><strong>Marketing &amp; Ops</strong> – Automate data cleaning, classify feedback, generate content.</li>
+  <li><strong>Students &amp; Researchers</strong> – Organize and analyze data effortlessly.</li>
+</ul>
+
+<br />
+
+<p><strong>→ Plans &amp; Pricing</strong></p>
+<p>Start with a Free Trial (no credit card required), then choose the plan that fits you best:</p>
+<ul>
+  <li><strong>STARTER</strong> – Hassle-free. We cover OpenAI costs and manage your usage.</li>
+  <li><strong>PRO</strong> – Fixed add-in subscription; AI usage billed directly via your own OpenAI account.</li>
+  <li><strong>TEAM</strong> – Add/remove users easily with one master bill. Perfect for businesses.</li>
+</ul>
+
+<br />
+
+<p><strong>→ Frequently Asked Questions</strong></p>
+<p><strong>What makes TwistlyCells different?</strong><br />
+It's a fully integrated Excel add-in with dual AI (ChatGPT + Claude) and custom Excel functions — not just a wrapper.</p>
+
+<p><strong>Can it handle large files?</strong><br />
+Yes. TwistlyCells is optimized for big datasets, making it the most powerful Excel AI generator.</p>
+
+<p><strong>How good is the AI Excel formula generator?</strong><br />
+Revolutionary — just describe what you need, and it creates complex formulas instantly.</p>

@@ -13,8 +13,6 @@ module.exports = {
   // OpenAI configuration
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'your-openai-api-key-here',
   
-  // File paths
-  DESCRIPTION_FILE_PATH: './description.txt',
   
   // URLs (usually don't need to change these)
   LOGIN_URL: 'https://partner.microsoft.com/_login?authType=OpenIdConnect',

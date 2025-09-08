@@ -1,17 +1,28 @@
 {
-  "name": "addin-selenium",
+  "name": "appsource-listing-updater",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "AppSource listing updater with translation console",
+  "main": "update-listing.js",
   "scripts": {
+    "start": "node update-listing.js",
+    "console": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "appsource",
+    "translation",
+    "selenium",
+    "openai"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "cors": "^2.8.5",
     "csv-parse": "^5.6.0",
+    "express": "^4.21.2",
     "openai": "^4.104.0",
-    "selenium-webdriver": "^4.35.0"
+    "selenium-webdriver": "^4.35.0",
+    "socket.io": "^4.8.1",
+    "sqlite3": "^5.1.7"
   }
 }

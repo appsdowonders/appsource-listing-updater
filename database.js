@@ -31,6 +31,9 @@ class Database {
           name TEXT NOT NULL,
           summary TEXT NOT NULL,
           description TEXT NOT NULL,
+          keyword1 TEXT,
+          keyword2 TEXT,
+          keyword3 TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -42,6 +45,9 @@ class Database {
           language_code TEXT NOT NULL,
           summary TEXT,
           description TEXT,
+          keyword1 TEXT,
+          keyword2 TEXT,
+          keyword3 TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(language_code)
@@ -55,12 +61,48 @@ class Database {
           return;
         }
         
+        // Add keyword columns to existing product_content table if they don't exist
+        // SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we ignore errors
+        this.db.run('ALTER TABLE product_content ADD COLUMN keyword1 TEXT', (err) => {
+          if (err && !err.message.includes('duplicate column')) {
+            console.log('Note: keyword1 column may already exist');
+          }
+        });
+        this.db.run('ALTER TABLE product_content ADD COLUMN keyword2 TEXT', (err) => {
+          if (err && !err.message.includes('duplicate column')) {
+            console.log('Note: keyword2 column may already exist');
+          }
+        });
+        this.db.run('ALTER TABLE product_content ADD COLUMN keyword3 TEXT', (err) => {
+          if (err && !err.message.includes('duplicate column')) {
+            console.log('Note: keyword3 column may already exist');
+          }
+        });
+        
         this.db.run(createTranslationsTableSQL, (err) => {
           if (err) {
             console.error('Error creating translations table:', err.message);
             reject(err);
             return;
           }
+          
+          // Add keyword columns to existing translations table if they don't exist
+          this.db.run('ALTER TABLE translations ADD COLUMN keyword1 TEXT', (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.log('Note: keyword1 column may already exist in translations');
+            }
+          });
+          this.db.run('ALTER TABLE translations ADD COLUMN keyword2 TEXT', (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.log('Note: keyword2 column may already exist in translations');
+            }
+          });
+          this.db.run('ALTER TABLE translations ADD COLUMN keyword3 TEXT', (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.log('Note: keyword3 column may already exist in translations');
+            }
+          });
+          
           console.log('Product content table ready');
           console.log('Translations table ready');
           resolve();
@@ -72,7 +114,7 @@ class Database {
   // Get current product content
   async getProductContent() {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT name, summary, description FROM product_content ORDER BY updated_at DESC LIMIT 1';
+      const sql = 'SELECT name, summary, description, keyword1, keyword2, keyword3 FROM product_content ORDER BY updated_at DESC LIMIT 1';
       
       this.db.get(sql, (err, row) => {
         if (err) {
@@ -90,21 +132,24 @@ class Database {
         resolve({
           name: row.name,
           summary: row.summary,
-          description: row.description
+          description: row.description,
+          keyword1: row.keyword1 || '',
+          keyword2: row.keyword2 || '',
+          keyword3: row.keyword3 || ''
         });
       });
     });
   }
 
   // Update product content
-  async updateProductContent(name, summary, description) {
+  async updateProductContent(name, summary, description, keyword1 = '', keyword2 = '', keyword3 = '') {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT INTO product_content (name, summary, description, updated_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO product_content (name, summary, description, keyword1, keyword2, keyword3, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `;
       
-      this.db.run(sql, [name, summary, description], function(err) {
+      this.db.run(sql, [name, summary, description, keyword1, keyword2, keyword3], function(err) {
         if (err) {
           console.error('Error updating product content:', err.message);
           reject(err);
@@ -117,6 +162,9 @@ class Database {
           name,
           summary,
           description,
+          keyword1,
+          keyword2,
+          keyword3,
           timestamp: Date.now()
         });
       });
@@ -141,14 +189,14 @@ class Database {
   }
 
   // Store translation for a language
-  async storeTranslation(languageCode, summary, description) {
+  async storeTranslation(languageCode, summary, description, keyword1 = '', keyword2 = '', keyword3 = '') {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT OR REPLACE INTO translations (language_code, summary, description, updated_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT OR REPLACE INTO translations (language_code, summary, description, keyword1, keyword2, keyword3, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `;
       
-      this.db.run(sql, [languageCode, summary, description], function(err) {
+      this.db.run(sql, [languageCode, summary, description, keyword1, keyword2, keyword3], function(err) {
         if (err) {
           console.error('Error storing translation:', err.message);
           reject(err);
@@ -161,6 +209,9 @@ class Database {
           languageCode,
           summary,
           description,
+          keyword1,
+          keyword2,
+          keyword3,
           timestamp: Date.now()
         });
       });
@@ -170,7 +221,7 @@ class Database {
   // Get translation for a specific language
   async getTranslation(languageCode) {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT language_code, summary, description, updated_at FROM translations WHERE language_code = ?';
+      const sql = 'SELECT language_code, summary, description, keyword1, keyword2, keyword3, updated_at FROM translations WHERE language_code = ?';
       
       this.db.get(sql, [languageCode], (err, row) => {
         if (err) {
@@ -188,6 +239,9 @@ class Database {
           languageCode: row.language_code,
           summary: row.summary,
           description: row.description,
+          keyword1: row.keyword1 || '',
+          keyword2: row.keyword2 || '',
+          keyword3: row.keyword3 || '',
           timestamp: new Date(row.updated_at).getTime()
         });
       });
@@ -197,7 +251,7 @@ class Database {
   // Get all translations
   async getAllTranslations() {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT language_code, summary, description, updated_at FROM translations ORDER BY language_code';
+      const sql = 'SELECT language_code, summary, description, keyword1, keyword2, keyword3, updated_at FROM translations ORDER BY language_code';
       
       this.db.all(sql, (err, rows) => {
         if (err) {
@@ -212,6 +266,9 @@ class Database {
             languageCode: row.language_code,
             summary: row.summary,
             description: row.description,
+            keyword1: row.keyword1 || '',
+            keyword2: row.keyword2 || '',
+            keyword3: row.keyword3 || '',
             timestamp: new Date(row.updated_at).getTime()
           };
         });

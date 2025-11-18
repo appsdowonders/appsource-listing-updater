@@ -14,6 +14,7 @@ const config = require('./config');
 const DEFAULT_UPDATE_FIELDS = {
   summary: true,      // Update the summary field
   description: true,  // Update the description field
+  keywords: true,    // Update the keywords fields
 };
 
 // Initialize field configuration from config file or use defaults
@@ -109,6 +110,19 @@ IMPORTANT RULES:
 
 Text to translate: {text}`;
 
+// Simple translation prompt for keywords (plain text, 40 char limit)
+const KEYWORD_TRANSLATION_PROMPT = `Translate the following search keyword to {target_language}. 
+
+IMPORTANT RULES:
+- Return ONLY plain text (no HTML, no special characters, no formatting)
+- Maximum 40 characters
+- Keep it concise and search-friendly
+- Translate naturally while maintaining search relevance
+- Do not add explanations or extra text
+- If it's a brand name or proper noun, you may keep it in English if appropriate
+
+Text to translate: {text}`;
+
 // Helper functions
 function shouldUpdateField(fieldName) {
   return config.UPDATE_FIELDS[fieldName] === true;
@@ -155,9 +169,14 @@ function getFilteredLanguages() {
 async function translateText(text, targetLanguage, fieldType = 'description') {
   try {
     // Use different prompts based on field type
-    const prompt = fieldType === 'summary' 
-      ? SUMMARY_TRANSLATION_PROMPT
-      : TRANSLATION_PROMPT;
+    let prompt;
+    if (fieldType === 'summary') {
+      prompt = SUMMARY_TRANSLATION_PROMPT;
+    } else if (fieldType === 'keyword') {
+      prompt = KEYWORD_TRANSLATION_PROMPT;
+    } else {
+      prompt = TRANSLATION_PROMPT;
+    }
     
     const finalPrompt = prompt
       .replace('{target_language}', targetLanguage)
@@ -170,6 +189,8 @@ async function translateText(text, targetLanguage, fieldType = 'description') {
           role: "system",
           content: fieldType === 'summary' 
             ? "You are a professional translator specializing in concise product summaries and marketing copy."
+            : fieldType === 'keyword'
+            ? "You are a professional translator specializing in search keywords and SEO terms."
             : "You are a professional translator specializing in software and technology content."
         },
         {
@@ -177,7 +198,7 @@ async function translateText(text, targetLanguage, fieldType = 'description') {
           content: finalPrompt
         }
       ],
-      max_tokens: fieldType === 'summary' ? 200 : 10000, // Lower token limit for summary
+      max_tokens: fieldType === 'summary' ? 200 : fieldType === 'keyword' ? 100 : 10000,
       temperature: 0
     });
     
@@ -192,6 +213,18 @@ async function translateText(text, targetLanguage, fieldType = 'description') {
       // Truncate if still too long
       if (result.length > 100) {
         result = result.substring(0, 97) + '...';
+      }
+    }
+    
+    // For keywords, ensure it's plain text and within character limit
+    if (fieldType === 'keyword') {
+      // Remove any HTML tags that might have been added
+      result = result.replace(/<[^>]*>/g, '');
+      // Remove any extra whitespace
+      result = result.replace(/\s+/g, ' ').trim();
+      // Truncate if still too long
+      if (result.length > 40) {
+        result = result.substring(0, 37) + '...';
       }
     }
     
@@ -223,7 +256,17 @@ app.get('/api/content', async (req, res) => {
 // Update English content
 app.post('/api/content', async (req, res) => {
   try {
-    const { name, summary, description } = req.body;
+    const { name, summary, description, keyword1 = '', keyword2 = '', keyword3 = '' } = req.body;
+    
+    // Log received data for debugging
+    console.log('Received content update:', {
+      name: name ? 'present' : 'missing',
+      summary: summary ? 'present' : 'missing',
+      description: description ? 'present' : 'missing',
+      keyword1: keyword1 || '(empty)',
+      keyword2: keyword2 || '(empty)',
+      keyword3: keyword3 || '(empty)'
+    });
     
     // Validate required fields
     if (!name || !summary || !description) {
@@ -234,7 +277,14 @@ app.post('/api/content', async (req, res) => {
     }
     
     // Update database
-    const result = await db.updateProductContent(name, summary, description);
+    const result = await db.updateProductContent(name, summary, description, keyword1, keyword2, keyword3);
+    
+    console.log('Database update result:', {
+      id: result.id,
+      keyword1: result.keyword1 || '(empty)',
+      keyword2: result.keyword2 || '(empty)',
+      keyword3: result.keyword3 || '(empty)'
+    });
     
     addLog(`✅ English content updated successfully in database`, 'success');
     
@@ -245,10 +295,14 @@ app.post('/api/content', async (req, res) => {
         name,
         summary,
         description,
+        keyword1,
+        keyword2,
+        keyword3,
         timestamp: result.timestamp
       }
     });
   } catch (error) {
+    console.error('Error updating content:', error);
     addLog(`❌ Error updating content: ${error.message}`, 'error');
     res.status(500).json({
       success: false,
@@ -286,6 +340,9 @@ app.get('/api/translation/:languageCode', async (req, res) => {
           languageCode: translation.languageCode,
           summary: translation.summary,
           description: translation.description,
+          keyword1: translation.keyword1 || '',
+          keyword2: translation.keyword2 || '',
+          keyword3: translation.keyword3 || '',
           timestamp: translation.timestamp,
           cached: true
         }
@@ -297,6 +354,9 @@ app.get('/api/translation/:languageCode', async (req, res) => {
           languageCode,
           summary: null,
           description: null,
+          keyword1: null,
+          keyword2: null,
+          keyword3: null,
           cached: false
         }
       });
@@ -326,17 +386,24 @@ app.post('/api/translate/batch', async (req, res) => {
           const englishDataWithName = {
             name: englishData.name,
             summary: englishData.summary,
-            description: englishData.description
+            description: englishData.description,
+            keyword1: englishData.keyword1 || '',
+            keyword2: englishData.keyword2 || '',
+            keyword3: englishData.keyword3 || ''
           };
           
           // Store English content in database
-          await db.storeTranslation(languageCode, englishDataWithName.summary, englishDataWithName.description);
+          await db.storeTranslation(languageCode, englishDataWithName.summary, englishDataWithName.description, 
+            englishDataWithName.keyword1, englishDataWithName.keyword2, englishDataWithName.keyword3);
           
           results.push({
             languageCode,
             success: true,
             summary: englishDataWithName.summary,
             description: englishDataWithName.description,
+            keyword1: englishDataWithName.keyword1,
+            keyword2: englishDataWithName.keyword2,
+            keyword3: englishDataWithName.keyword3,
             timestamp: Date.now()
           });
           
@@ -348,6 +415,10 @@ app.post('/api/translate/batch', async (req, res) => {
         const translationPromises = [];
         let summaryTranslation = englishData.summary; // Default to original
         let descriptionTranslation = englishData.description; // Default to original
+        // Keywords are translated
+        let keyword1 = englishData.keyword1 || '';
+        let keyword2 = englishData.keyword2 || '';
+        let keyword3 = englishData.keyword3 || '';
         
         if (shouldUpdateField('summary')) {
           translationPromises.push(
@@ -365,19 +436,47 @@ app.post('/api/translate/batch', async (req, res) => {
           );
         }
         
+        // Translate keywords (if configured to update)
+        if (shouldUpdateField('keywords')) {
+          if (keyword1) {
+            translationPromises.push(
+              translateText(keyword1, languageCode, 'keyword').then(result => {
+                keyword1 = result;
+              })
+            );
+          }
+          if (keyword2) {
+            translationPromises.push(
+              translateText(keyword2, languageCode, 'keyword').then(result => {
+                keyword2 = result;
+              })
+            );
+          }
+          if (keyword3) {
+            translationPromises.push(
+              translateText(keyword3, languageCode, 'keyword').then(result => {
+                keyword3 = result;
+              })
+            );
+          }
+        }
+        
         // Wait for all translations to complete
         if (translationPromises.length > 0) {
           await Promise.all(translationPromises);
         }
         
-        // Store translation in database
-        await db.storeTranslation(languageCode, summaryTranslation, descriptionTranslation);
+        // Store translation in database (keywords translated)
+        await db.storeTranslation(languageCode, summaryTranslation, descriptionTranslation, keyword1, keyword2, keyword3);
         
         results.push({
           languageCode,
           success: true,
           summary: summaryTranslation,
           description: descriptionTranslation,
+          keyword1,
+          keyword2,
+          keyword3,
           timestamp: Date.now()
         });
         
@@ -424,11 +523,15 @@ app.post('/api/translate/:languageCode', async (req, res) => {
       const englishDataWithName = {
         name: englishData.name,
         summary: englishData.summary,
-        description: englishData.description
+        description: englishData.description,
+        keyword1: englishData.keyword1 || '',
+        keyword2: englishData.keyword2 || '',
+        keyword3: englishData.keyword3 || ''
       };
       
       // Store English content in database
-      await db.storeTranslation(languageCode, englishDataWithName.summary, englishDataWithName.description);
+      await db.storeTranslation(languageCode, englishDataWithName.summary, englishDataWithName.description,
+        englishDataWithName.keyword1, englishDataWithName.keyword2, englishDataWithName.keyword3);
       
       addLog(`✅ ${languageCode}: Using original English content`, 'success');
       
@@ -438,6 +541,9 @@ app.post('/api/translate/:languageCode', async (req, res) => {
           languageCode,
           summary: englishDataWithName.summary,
           description: englishDataWithName.description,
+          keyword1: englishDataWithName.keyword1,
+          keyword2: englishDataWithName.keyword2,
+          keyword3: englishDataWithName.keyword3,
           timestamp: Date.now(),
           cached: true
         }
@@ -449,6 +555,10 @@ app.post('/api/translate/:languageCode', async (req, res) => {
     const translationPromises = [];
     let summaryTranslation = englishData.summary; // Default to original
     let descriptionTranslation = englishData.description; // Default to original
+    // Keywords are translated
+    let keyword1 = englishData.keyword1 || '';
+    let keyword2 = englishData.keyword2 || '';
+    let keyword3 = englishData.keyword3 || '';
     
     if (shouldUpdateField('summary')) {
       translationPromises.push(
@@ -466,13 +576,38 @@ app.post('/api/translate/:languageCode', async (req, res) => {
       );
     }
     
+    // Translate keywords (if configured to update)
+    if (shouldUpdateField('keywords')) {
+      if (keyword1) {
+        translationPromises.push(
+          translateText(keyword1, languageCode, 'keyword').then(result => {
+            keyword1 = result;
+          })
+        );
+      }
+      if (keyword2) {
+        translationPromises.push(
+          translateText(keyword2, languageCode, 'keyword').then(result => {
+            keyword2 = result;
+          })
+        );
+      }
+      if (keyword3) {
+        translationPromises.push(
+          translateText(keyword3, languageCode, 'keyword').then(result => {
+            keyword3 = result;
+          })
+        );
+      }
+    }
+    
     // Wait for all translations to complete
     if (translationPromises.length > 0) {
       await Promise.all(translationPromises);
     }
     
-    // Store translation in database
-    await db.storeTranslation(languageCode, summaryTranslation, descriptionTranslation);
+    // Store translation in database (keywords translated)
+    await db.storeTranslation(languageCode, summaryTranslation, descriptionTranslation, keyword1, keyword2, keyword3);
     
     addLog(`✅ ${languageCode}: Translation completed and stored in database`, 'success');
     
@@ -482,6 +617,9 @@ app.post('/api/translate/:languageCode', async (req, res) => {
         languageCode,
         summary: summaryTranslation,
         description: descriptionTranslation,
+        keyword1,
+        keyword2,
+        keyword3,
         timestamp: Date.now(),
         cached: true
       }
@@ -557,21 +695,22 @@ app.get('/api/config/fields', (req, res) => {
 // Update field configuration
 app.post('/api/config/fields', (req, res) => {
   try {
-    const { summary, description } = req.body;
+    const { summary, description, keywords } = req.body;
     
     // Validate the input
-    if (typeof summary !== 'boolean' || typeof description !== 'boolean') {
+    if (typeof summary !== 'boolean' || typeof description !== 'boolean' || typeof keywords !== 'boolean') {
       return res.status(400).json({
         success: false,
-        error: 'Summary and description must be boolean values'
+        error: 'Summary, description, and keywords must be boolean values'
       });
     }
     
     // Update the configuration
     config.UPDATE_FIELDS.summary = summary;
     config.UPDATE_FIELDS.description = description;
+    config.UPDATE_FIELDS.keywords = keywords;
     
-    addLog(`✅ Field configuration updated: Summary=${summary}, Description=${description}`, 'success');
+    addLog(`✅ Field configuration updated: Summary=${summary}, Description=${description}, Keywords=${keywords}`, 'success');
     
     res.json({
       success: true,
@@ -651,6 +790,9 @@ async function executeUpdateProcess(languageCodes) {
         availableTranslations[languageCode] = {
           summary: englishData.summary,
           description: englishData.description,
+          keyword1: englishData.keyword1 || '',
+          keyword2: englishData.keyword2 || '',
+          keyword3: englishData.keyword3 || '',
           timestamp: Date.now()
         };
         addLog(`📋 Using original English content for ${languageCode}`, 'info');
@@ -660,6 +802,9 @@ async function executeUpdateProcess(languageCodes) {
           availableTranslations[languageCode] = {
             summary: translation.summary,
             description: translation.description,
+            keyword1: translation.keyword1 || '',
+            keyword2: translation.keyword2 || '',
+            keyword3: translation.keyword3 || '',
             timestamp: translation.timestamp
           };
           addLog(`📋 Using database translation for ${languageCode}`, 'info');
@@ -777,7 +922,7 @@ server.listen(PORT, async () => {
     console.log(`🚀 Translation Console Server running on http://localhost:${PORT}`);
     console.log(`📋 Configuration loaded:`);
     console.log(`   - Languages: ${getFilteredLanguages().length} supported`);
-    console.log(`   - Field updates: Summary=${config.UPDATE_FIELDS.summary}, Description=${config.UPDATE_FIELDS.description}`);
+    console.log(`   - Field updates: Summary=${config.UPDATE_FIELDS.summary}, Description=${config.UPDATE_FIELDS.description}, Keywords=${config.UPDATE_FIELDS.keywords}`);
     console.log(`   - Database: SQLite initialized`);
     
     // Add initial log to test the system

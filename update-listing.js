@@ -201,8 +201,25 @@ async function performMicrosoftLogin(driver) {
     await driver.sleep(3000); // Wait for page to load
     
     // Check if we're still on a valid page
-    const currentUrl = await driver.getCurrentUrl();
+    let currentUrl = await driver.getCurrentUrl();
     console.log(`Current URL after navigation: ${currentUrl}`);
+    
+    // Check if we're on the partner center homepage (already logged in or redirected)
+    // Handle variations: with/without trailing slash, case variations
+    const normalizedUrl = currentUrl.toLowerCase().replace(/\/$/, '');
+    if (normalizedUrl === 'https://partner.microsoft.com/en-us') {
+      console.log('Detected partner center homepage, navigating to dashboard...');
+      await driver.get(DASHBOARD_URL);
+      await driver.sleep(3000); // Wait for page to load
+      currentUrl = await driver.getCurrentUrl();
+      console.log(`Current URL after dashboard navigation: ${currentUrl}`);
+      
+      // If we're already on the dashboard, we're done with login
+      if (currentUrl.includes('partner.microsoft.com') && currentUrl.includes('dashboard')) {
+        console.log('Already logged in and on dashboard, skipping login process');
+        return;
+      }
+    }
     
     if (!currentUrl.includes('login.microsoftonline.com') && !currentUrl.includes('microsoft.com')) {
       throw new Error(`Unexpected redirect to: ${currentUrl}`);
@@ -351,27 +368,93 @@ async function navigateToProductListings(driver, englishData) {
   
   // Navigate to dashboard
   await driver.get(DASHBOARD_URL);
+  await driver.sleep(3000); // Wait for page to load
+  
+  // Wait for any overlays or loading elements to disappear
+  console.log('Waiting for page to fully load...');
+  await driver.sleep(2000);
   
   // Click on "Microsoft 365 and Copilot" section
+  console.log('Looking for "Microsoft 365 and Copilot" section...');
   const m365Section = await driver.wait(
     until.elementLocated(By.xpath("//*[contains(text(), 'Microsoft 365 and Copilot')]")),
     60_000
   );
-  await m365Section.click();
+  
+  // Wait for element to be visible and clickable
+  await driver.wait(until.elementIsVisible(m365Section), 10_000);
+  await driver.wait(until.elementIsEnabled(m365Section), 10_000);
+  
+  // Scroll element into view
+  console.log('Scrolling element into view...');
+  await driver.executeScript("arguments[0].scrollIntoView({ behavior: 'smooth', block: 'center' });", m365Section);
+  await driver.sleep(1000); // Wait for scroll to complete
+  
+  // Try to click with JavaScript if regular click fails
+  try {
+    await m365Section.click();
+    console.log('Successfully clicked "Microsoft 365 and Copilot" section');
+  } catch (e) {
+    console.log('Regular click failed, trying JavaScript click...');
+    await driver.executeScript("arguments[0].click();", m365Section);
+    console.log('Successfully clicked using JavaScript');
+  }
+  
+  // Wait a bit for the page to update after clicking M365 section
+  await driver.sleep(2000);
   
   // Click on product using product name from database
+  console.log(`Looking for product: ${englishData.name}...`);
   const productLink = await driver.wait(
     until.elementLocated(By.xpath(`//a[contains(text(), '${englishData.name}')]`)),
     60_000
   );
-  await productLink.click();
+  
+  // Wait for element to be visible and clickable
+  await driver.wait(until.elementIsVisible(productLink), 10_000);
+  await driver.wait(until.elementIsEnabled(productLink), 10_000);
+  
+  // Scroll element into view
+  await driver.executeScript("arguments[0].scrollIntoView({ behavior: 'smooth', block: 'center' });", productLink);
+  await driver.sleep(1000);
+  
+  // Try to click with JavaScript if regular click fails
+  try {
+    await productLink.click();
+    console.log(`Successfully clicked product: ${englishData.name}`);
+  } catch (e) {
+    console.log('Regular click failed, trying JavaScript click...');
+    await driver.executeScript("arguments[0].click();", productLink);
+    console.log('Successfully clicked product using JavaScript');
+  }
+  
+  // Wait for page to load after clicking product
+  await driver.sleep(2000);
   
   // Click on the language menu (Marketplace listings)
+  console.log('Looking for "Marketplace listings" menu...');
   const languageMenu = await driver.wait(
     until.elementLocated(By.xpath("//he-task-item[contains(text(), 'Marketplace listings')]")),
     30_000
   );
-  await languageMenu.click();
+  
+  // Wait for element to be visible and clickable
+  await driver.wait(until.elementIsVisible(languageMenu), 10_000);
+  await driver.wait(until.elementIsEnabled(languageMenu), 10_000);
+  
+  // Scroll element into view
+  await driver.executeScript("arguments[0].scrollIntoView({ behavior: 'smooth', block: 'center' });", languageMenu);
+  await driver.sleep(1000);
+  
+  // Try to click with JavaScript if regular click fails
+  try {
+    await languageMenu.click();
+    console.log('Successfully clicked "Marketplace listings" menu');
+  } catch (e) {
+    console.log('Regular click failed, trying JavaScript click...');
+    await driver.executeScript("arguments[0].click();", languageMenu);
+    console.log('Successfully clicked menu using JavaScript');
+  }
   
   console.log('Successfully navigated to product listings');
 }
@@ -384,7 +467,24 @@ async function navigateBackToMarketplaceListings(driver) {
     until.elementLocated(By.xpath("//he-task-item[contains(text(), 'Marketplace listings')]")),
     10_000
   );
-  await marketplaceLink.click();
+  
+  // Wait for element to be visible and clickable
+  await driver.wait(until.elementIsVisible(marketplaceLink), 10_000);
+  await driver.wait(until.elementIsEnabled(marketplaceLink), 10_000);
+  
+  // Scroll element into view
+  await driver.executeScript("arguments[0].scrollIntoView({ behavior: 'smooth', block: 'center' });", marketplaceLink);
+  await driver.sleep(1000);
+  
+  // Try to click with JavaScript if regular click fails
+  try {
+    await marketplaceLink.click();
+    console.log('Successfully clicked "Marketplace listings" link');
+  } catch (e) {
+    console.log('Regular click failed, trying JavaScript click...');
+    await driver.executeScript("arguments[0].click();", marketplaceLink);
+    console.log('Successfully clicked link using JavaScript');
+  }
   
   console.log('Successfully navigated back to Marketplace listings');
 }
@@ -405,8 +505,39 @@ async function selectLanguage(driver, languageName, isFirstLanguage = false) {
       10_000
     );
     
-    // Click on the language link
-    await languageLink.click();
+    // Wait for element to be visible and clickable
+    await driver.wait(until.elementIsVisible(languageLink), 10_000);
+    await driver.wait(until.elementIsEnabled(languageLink), 10_000);
+    
+    // Scroll element into view
+    await driver.executeScript("arguments[0].scrollIntoView({ behavior: 'smooth', block: 'center' });", languageLink);
+    await driver.sleep(500);
+    
+    // Use JavaScript click first to avoid overlay interception
+    try {
+      await driver.executeScript("arguments[0].click();", languageLink);
+      console.log(`Successfully clicked language: ${languageName} using JavaScript`);
+    } catch (e) {
+      console.log('JavaScript click failed, trying regular click with overlay handling...');
+      try {
+        // Try to disable pointer events on overlays
+        await driver.executeScript(`
+          const overlays = document.querySelectorAll('he-shell');
+          overlays.forEach(overlay => {
+            if (overlay.style) {
+              overlay.style.pointerEvents = 'none';
+            }
+          });
+        `);
+        await driver.sleep(200);
+        await languageLink.click();
+        console.log(`Successfully clicked language: ${languageName}`);
+      } catch (fallbackError) {
+        console.log(`⚠️  All click methods failed for language ${languageName}: ${fallbackError.message}`);
+        throw fallbackError;
+      }
+    }
+    
     await driver.sleep(1000);
     console.log(`Successfully selected language: ${languageName}`);
     return true;
@@ -416,9 +547,52 @@ async function selectLanguage(driver, languageName, isFirstLanguage = false) {
   }
 }
 
-async function fillDescription(driver, descriptionText, summaryText) {
+async function fillDescription(driver, descriptionText, summaryText, keyword1 = '', keyword2 = '', keyword3 = '') {
   console.log('Filling summary and description fields...');
   
+  // Helper function to safely fill a textarea field using JavaScript
+  const fillTextarea = async (element, text) => {
+    // Scroll element into view
+    await driver.executeScript('arguments[0].scrollIntoView({ behavior: "smooth", block: "center" });', element);
+    await driver.sleep(300);
+    
+    // Use JavaScript to set the value directly (avoids click interception)
+    await driver.executeScript(`
+      const element = arguments[0];
+      const text = arguments[1];
+      
+      // Set the value
+      element.value = text;
+      
+      // Trigger input and change events for Angular to detect the change
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      // Also trigger Angular-specific events if needed
+      if (element.ngModelController) {
+        element.ngModelController.$setViewValue(text);
+      }
+    `, element, text);
+    
+    await driver.sleep(500);
+    
+    // Verify the value was set
+    const actualValue = await element.getAttribute('value') || '';
+    if (actualValue !== text) {
+      console.log(`⚠️  Warning: Value mismatch. Expected length: ${text.length}, Actual length: ${actualValue.length}`);
+      // Try alternative method: focus and sendKeys
+      try {
+        await driver.executeScript('arguments[0].focus();', element);
+        await driver.sleep(200);
+        await element.sendKeys(Key.COMMAND, 'a');
+        await element.sendKeys(Key.DELETE);
+        await element.sendKeys(text);
+        await driver.sleep(500);
+      } catch (error) {
+        console.log(`⚠️  Alternative fill method also failed: ${error.message}`);
+      }
+    }
+  };
   
   // Fill summary field (if configured to update)
   if (shouldUpdateField('summary')) {
@@ -428,22 +602,11 @@ async function fillDescription(driver, descriptionText, summaryText) {
       30_000
     );
     
-    await summaryField.click();
-    await driver.sleep(500);
-    
-    // Clear existing content
-    await summaryField.sendKeys(Key.COMMAND, 'a');
-    await summaryField.sendKeys(Key.DELETE);
-    await driver.sleep(500);
-    
-    // Fill with new text
-    await summaryField.sendKeys(summaryText);
-    await driver.sleep(1000);
+    await fillTextarea(summaryField, summaryText);
     
     // Debug: Verify what was actually filled
     const filledSummary = await summaryField.getAttribute('value') || await summaryField.getText() || '';
-    
-    console.log('Successfully filled summary field');
+    console.log(`Successfully filled summary field (length: ${filledSummary.length})`);
   } else {
     console.log('⏭️  Skipping summary field update (disabled in config)');
   }
@@ -456,21 +619,67 @@ async function fillDescription(driver, descriptionText, summaryText) {
       30_000
     );
     
-    await descField.click();
-    await driver.sleep(500);
+    await fillTextarea(descField, descriptionText);
     
-    // Clear existing content
-    await descField.sendKeys(Key.COMMAND, 'a');
-    await descField.sendKeys(Key.DELETE);
-    await driver.sleep(500);
-    
-    // Fill with new text
-    await descField.sendKeys(descriptionText);
-    await driver.sleep(1000);
-    
-    console.log('Successfully filled description field');
+    // Verify the description was filled
+    const filledDescription = await descField.getAttribute('value') || '';
+    console.log(`Successfully filled description field (length: ${filledDescription.length})`);
   } else {
     console.log('⏭️  Skipping description field update (disabled in config)');
+  }
+  
+  // Fill search keywords (if configured to update and provided)
+  if (shouldUpdateField('keywords') && (keyword1 || keyword2 || keyword3)) {
+    console.log('Filling search keywords...');
+    
+    // Helper function to fill a keyword input field
+    const fillKeywordField = async (fieldId, keyword) => {
+      if (!keyword) return; // Skip empty keywords
+      
+      try {
+        const keywordField = await driver.wait(
+          until.elementLocated(By.id(fieldId)),
+          10_000
+        );
+        
+        // Scroll element into view
+        await driver.executeScript('arguments[0].scrollIntoView({ behavior: "smooth", block: "center" });', keywordField);
+        await driver.sleep(300);
+        
+        // Use JavaScript to set the value directly
+        await driver.executeScript(`
+          const element = arguments[0];
+          const text = arguments[1];
+          
+          // Set the value
+          element.value = text;
+          
+          // Trigger input and change events for Angular to detect the change
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+        `, keywordField, keyword);
+        
+        await driver.sleep(300);
+        console.log(`✅ Filled keyword field ${fieldId} with: ${keyword}`);
+      } catch (error) {
+        console.log(`⚠️  Warning: Could not fill keyword field ${fieldId}: ${error.message}`);
+      }
+    };
+    
+    // Fill keyword fields (field-0, field-1, field-2)
+    if (keyword1) {
+      await fillKeywordField('field-0', keyword1);
+    }
+    if (keyword2) {
+      await fillKeywordField('field-1', keyword2);
+    }
+    if (keyword3) {
+      await fillKeywordField('field-2', keyword3);
+    }
+    
+    console.log('Successfully filled search keywords');
+  } else {
+    console.log('⏭️  No keywords provided, skipping keyword fields');
   }
 }
 
@@ -483,7 +692,45 @@ async function clickSaveAndConfirm(driver) {
     SAVE_WAIT_SECONDS
   );
   await driver.wait(until.elementIsEnabled(saveBtn), 10_000);
-  await saveBtn.click();
+  
+  // Scroll button into view to avoid overlay interception
+  await driver.executeScript('arguments[0].scrollIntoView({ behavior: "smooth", block: "center" });', saveBtn);
+  await driver.sleep(300);
+  
+  // Use JavaScript to click the button (avoids click interception by overlays)
+  try {
+    await driver.executeScript('arguments[0].click();', saveBtn);
+    console.log('Save button clicked via JavaScript');
+  } catch (error) {
+    console.log(`⚠️  JavaScript click failed: ${error.message}, trying alternative method...`);
+    // Fallback: try to remove overlay and click normally
+    try {
+      // Try to hide any overlays
+      await driver.executeScript(`
+        const overlays = document.querySelectorAll('he-shell');
+        overlays.forEach(overlay => {
+          if (overlay.style) {
+            overlay.style.pointerEvents = 'none';
+          }
+        });
+      `);
+      await driver.sleep(200);
+      await saveBtn.click();
+      console.log('Save button clicked via fallback method');
+    } catch (fallbackError) {
+      console.log(`⚠️  Fallback click also failed: ${fallbackError.message}`);
+      // Last resort: submit the form directly
+      await driver.executeScript(`
+        const form = arguments[0].closest('form');
+        if (form) {
+          form.submit();
+        } else {
+          arguments[0].click();
+        }
+      `, saveBtn);
+      console.log('Form submitted directly');
+    }
+  }
 
   console.log('Waiting for save confirmation...');
   
@@ -821,10 +1068,18 @@ async function translateText(text, targetLanguage) {
 }
 
 async function translateListingData(englishData, languageCode, useCache = true) {
+  // Keywords for English (not translated)
+  const englishKeywords = {
+    keyword1: englishData.keyword1 || '',
+    keyword2: englishData.keyword2 || '',
+    keyword3: englishData.keyword3 || ''
+  };
+  
   if (languageCode === 'en-US') {
     console.log('Using original English content (no translation needed)');
     const englishDataWithName = {
-      name: englishData.name // Keep name in English for consistency
+      name: englishData.name, // Keep name in English for consistency
+      ...englishKeywords
     };
     
     // Only include fields that should be updated
@@ -849,7 +1104,10 @@ async function translateListingData(englishData, languageCode, useCache = true) 
   if (cachedTranslation) {
     console.log(`📋 Using cached translation from web console for ${languageCode}`);
     const translatedData = {
-      name: englishData.name // Keep name in English for consistency
+      name: englishData.name, // Keep name in English for consistency
+      keyword1: cachedTranslation.keyword1 || englishKeywords.keyword1,
+      keyword2: cachedTranslation.keyword2 || englishKeywords.keyword2,
+      keyword3: cachedTranslation.keyword3 || englishKeywords.keyword3
     };
     
     // Only include fields that should be updated
@@ -873,7 +1131,10 @@ async function translateListingData(englishData, languageCode, useCache = true) 
   if (useCache && isTranslationCached(languageCode)) {
     const cached = getCachedTranslation(languageCode);
     const translatedData = {
-      name: englishData.name // Keep name in English for consistency
+      name: englishData.name, // Keep name in English for consistency
+      keyword1: cached.keyword1 || englishKeywords.keyword1,
+      keyword2: cached.keyword2 || englishKeywords.keyword2,
+      keyword3: cached.keyword3 || englishKeywords.keyword3
     };
     
     // Only include fields that should be updated
@@ -916,6 +1177,48 @@ async function translateListingData(englishData, languageCode, useCache = true) 
     );
   } else {
     console.log('⏭️  Skipping description translation (disabled in config)');
+  }
+  
+  // Translate keywords (if configured to update)
+  if (shouldUpdateField('keywords')) {
+    if (englishKeywords.keyword1) {
+      console.log('🔄 Translating keyword 1...');
+      translationPromises.push(
+        translateText(englishKeywords.keyword1, languageCode).then(result => {
+          translatedData.keyword1 = result;
+        })
+      );
+    } else {
+      translatedData.keyword1 = '';
+    }
+    
+    if (englishKeywords.keyword2) {
+      console.log('🔄 Translating keyword 2...');
+      translationPromises.push(
+        translateText(englishKeywords.keyword2, languageCode).then(result => {
+          translatedData.keyword2 = result;
+        })
+      );
+    } else {
+      translatedData.keyword2 = '';
+    }
+    
+    if (englishKeywords.keyword3) {
+      console.log('🔄 Translating keyword 3...');
+      translationPromises.push(
+        translateText(englishKeywords.keyword3, languageCode).then(result => {
+          translatedData.keyword3 = result;
+        })
+      );
+    } else {
+      translatedData.keyword3 = '';
+    }
+  } else {
+    console.log('⏭️  Skipping keywords translation (disabled in config)');
+    // Copy keywords from English if not translating
+    translatedData.keyword1 = englishKeywords.keyword1;
+    translatedData.keyword2 = englishKeywords.keyword2;
+    translatedData.keyword3 = englishKeywords.keyword3;
   }
   
   // Wait for all translations to complete
@@ -966,7 +1269,9 @@ async function main() {
     name: englishData.name,
     summary: englishData.summary.substring(0, 50) + '...',
     description: englishData.description.substring(0, 50) + '...',
-    keywords: englishData.keywords
+    keyword1: englishData.keyword1 || '',
+    keyword2: englishData.keyword2 || '',
+    keyword3: englishData.keyword3 || ''
   });
 
   const driver = await buildDriver();
@@ -1012,7 +1317,14 @@ async function main() {
       }
       
       // Fill the summary and description with translated content
-      await fillDescription(driver, listingData.description || '', listingData.summary || '');
+      await fillDescription(
+        driver, 
+        listingData.description || '', 
+        listingData.summary || '',
+        listingData.keyword1 || '',
+        listingData.keyword2 || '',
+        listingData.keyword3 || ''
+      );
       
       // Save and confirm
       const conf = await clickSaveAndConfirm(driver);

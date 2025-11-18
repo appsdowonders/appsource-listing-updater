@@ -20,9 +20,9 @@ if [ ! -f "config.js" ]; then
 fi
 
 # Check if description.txt exists
-if [ ! -f "description.txt" ]; then
-    echo "❌ Error: description.txt not found!"
-    echo "Please create description.txt with your product description."
+if [ ! -f "descriptions/description.txt" ]; then
+    echo "❌ Error: descriptions/description.txt not found!"
+    echo "Please create descriptions/description.txt with your product description."
     exit 1
 fi
 

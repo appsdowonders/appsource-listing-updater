@@ -170,3 +170,7 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
+
+# Description files (except example)
+descriptions/*
+!descriptions/description.example.txt
